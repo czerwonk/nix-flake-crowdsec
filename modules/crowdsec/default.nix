@@ -127,6 +127,13 @@ in {
       type = format.type;
       default = {};
     };
+    journaldSupport = mkOption {
+      description = mkDoc ''
+        Allow acquisitions from systemd-journald
+      '';
+      type = types.bool;
+      default = false;
+    };
   };
   config = let
     cscli = pkgs.writeScriptBin "cscli" ''
@@ -204,7 +211,7 @@ in {
             ProtectControlGroups = mkDefault true;
 
             ProtectProc = mkDefault "invisible";
-            ProcSubset = mkDefault "pid";
+            ProcSubset = mkIf (!cfg.journaldSupport) (mkDefault "pid");
 
             RestrictNamespaces = mkDefault true;
             RestrictRealtime = mkDefault true;
@@ -258,6 +265,7 @@ in {
         isSystemUser = true;
         inherit group;
       };
+      users.users.${user}.extraGroups = lib.mkIf cfg.journaldSupport [ "systemd-journal" ];
 
       users.groups.${group} = lib.mapAttrs (name: lib.mkDefault) {};
     };
