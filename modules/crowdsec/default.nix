@@ -120,9 +120,10 @@ in {
       type = format.type;
       default = {};
     };
-    journaldSupport = mkOption {
+    allowLocalJournalAccess = mkOption {
       description = mkDoc ''
-        Allow acquisitions from systemd-journald
+        Allow acquisitions from local systemd-journald.
+        For details, see <https://doc.crowdsec.net/docs/data_sources/journald>.
       '';
       type = types.bool;
       default = false;
@@ -211,7 +212,7 @@ in {
             ProtectControlGroups = mkDefault true;
 
             ProtectProc = mkDefault "invisible";
-            ProcSubset = mkIf (!cfg.journaldSupport) (mkDefault "pid");
+            ProcSubset = mkIf (!cfg.allowLocalJournalAccess) (mkDefault "pid");
 
             RestrictNamespaces = mkDefault true;
             RestrictRealtime = mkDefault true;
@@ -266,7 +267,7 @@ in {
         description = lib.mkDefault "Cowdsec service user";
         isSystemUser = lib.mkDefault true;
         group = lib.mkDefault group;
-        extraGroups = lib.mkIf cfg.journaldSupport [ "systemd-journal" ];
+        extraGroups = lib.mkIf cfg.allowLocalJournalAccess ["systemd-journal"];
       };
 
       users.groups.${group} = lib.mapAttrs (name: lib.mkDefault) {};
