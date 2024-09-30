@@ -1,5 +1,7 @@
 # Crowdsec for NixOS
 
+## About
+
 This repository contains a [Nix flake](https://nixos.wiki/wiki/Flakes) for running [Crowdsec](https://www.crowdsec.net/) on NixOS.
 
 CrowdSec is a security tool designed to protect servers, services, and applications by analyzing user behavior and network traffic to detect and block potential attacks. It operates similarly to Fail2Ban but with a few key differences:
@@ -18,7 +20,7 @@ To setup the [security engine](https://docs.crowdsec.net/docs/getting_started/se
 {
   inputs = {
     crowdsec = {
-      url = "github:kampka/nix-flake-crowdsec";
+      url = "git+https://codeberg.org/kampka/nix-flake-crowdsec.git";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -58,7 +60,7 @@ To enroll your crowdsec engine into the central API, you need to obtain an enrol
 Enrolling your engine will give it access to community or commercial blocklist and decisions, depending on your plan.
 Enrollment is optional, if you do not want to enroll your engine and just at on your own logs / events, simply omit the `enrollKeyFile` from the settings.
 
-For additional configuration options, please consult the (Crowdsec documentation)[https://docs.crowdsec.net/docs/configuration/crowdsec_configuration/].
+For additional configuration options, please consult the [Crowdsec documentation](https://docs.crowdsec.net/docs/configuration/crowdsec_configuration/).
 
 
 ### Crowdsec firewall bouncer
@@ -75,7 +77,7 @@ Please consult the [bouncer documentation](https://docs.crowdsec.net/u/bouncers/
 {
   inputs = {
     crowdsec = {
-      url = "github:kampka/nix-flake-crowdsec";
+      url = "git+https://codeberg.org/kampka/nix-flake-crowdsec.git";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -122,3 +124,39 @@ Depending on your security requirements and secrets management, this process is 
 }
 
 ```
+
+## Examples
+
+### Local SSHd with systemd-journal
+
+This scenario is probably the most common scenario when getting started with Crowdsec.
+It configures the engine to parse logs from the systems local systemd-journal for
+failed SSH authentications and blocks IPs trying to brute-force the SSH key.
+
+```nix
+{
+  services.crowdsec = let
+    yaml = (pkgs.formats.yaml {}).generate;
+    acquisitions_file = yaml "acquisitions.yaml" {
+      source = "journalctl";
+      journalctl_filter = ["_SYSTEMD_UNIT=sshd.service"];
+      labels.type = "syslog";
+    };
+  in {
+    enable = true;
+    allowLocalJournalAccess = true;
+    settings = {
+      crowdsec_service.acquisition_path = acquisitions_file;
+    };
+  };
+}
+```
+
+Then, install a scenario to act on your logs. The [crowdsecurity/linux](https://app.crowdsec.net/hub/author/crowdsecurity/collections/linux)
+collection provides a good base collection to get started.
+
+```shell
+  cscli collections install crowdsecurity/linux
+```
+
+This can be automated using eg. `ExecStartPre` scripts. See some example in this README for inspiration.

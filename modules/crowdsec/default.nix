@@ -42,6 +42,14 @@
     };
     crowdsec_service = {
       enable = mkDefault true;
+      acquisition_dir = let
+        yamlFiles = map (format.generate "acquisition.yaml") cfg.acquisitions;
+        dir = pkgs.runCommand "crowdsec-acquisitions" {} ''
+          mkdir -p $out
+          cp ${lib.concatStringsSep " " yamlFiles} $out
+        '';
+      in
+        mkDefault dir;
     };
     api = {
       client = {
@@ -57,6 +65,12 @@
         online_client.credentials_path = mkDefault "${stateDir}/online_api_credentials.yaml";
       };
     };
+    prometheus = {
+      enabled = mkDefault true;
+      level = mkDefault "full";
+      listen_addr = mkDefault "127.0.0.1";
+      listen_port = mkDefault 6060;
+    };
   };
 
   user = "crowdsec";
@@ -67,11 +81,15 @@
 in {
   options.services.crowdsec = with lib; {
     enable = mkEnableOption "CrowSec Security Engine";
-    package = mkPackageOption pkgs "crowdsec" {};
+    package = mkOption {
+      description = "The crowdsec package to use in this module";
+      type = types.package;
+      default = pkgs.callPackage ../../packages/crowdsec {};
+    };
     name = mkOption {
       type = types.str;
       description = mdDoc ''
-        Name of the machine when registering it at the central or loal api.
+        Name of the machine when registering it at the central or local api.
       '';
       default = config.networking.hostName;
     };
@@ -82,6 +100,21 @@ in {
       '';
       type = types.nullOr types.path;
       default = null;
+    };
+    acquisitions = mkOption {
+      type = with types; listOf format.type;
+      default = {};
+      description = mdDoc ''
+        A list of acquisition specifications, which define the data sources you want to be parsed.
+        See <https://docs.crowdsec.net/u/getting_started/post_installation/acquisition_new> for details.
+      '';
+      example = [
+        {
+          source = "journalctl";
+          journalctl_filter = ["_SYSTEMD_UNIT=sshd.service"];
+          labels.type = "syslog";
+        }
+      ];
     };
     patterns = mkOption {
       description = mdDoc ''
@@ -97,8 +130,8 @@ in {
     };
     settings = mkOption {
       description = mdDoc ''
-        Settings for MediaMTX. Refer to the defaults at
-        <https://github.com/bluenviron/mediamtx/blob/main/mediamtx.yml>.
+        Settings for Crowdsec. Refer to the defaults at
+        <https://github.com/crowdsecurity/crowdsec/blob/master/config/config.yaml>.
       '';
       type = format.type;
       default = {};
@@ -124,6 +157,9 @@ in {
       #!${pkgs.runtimeShell}
       set -eu
       set -o pipefail
+
+      # cscli needs crowdsec on it's path in order to be able to run `cscli explain`
+      export PATH=$PATH:${lib.makeBinPath [pkg]}
 
       exec ${pkg}/bin/cscli -c=${configFile} "''${@}"
     '';
@@ -168,6 +204,8 @@ in {
           path = [cscli];
 
           wantedBy = ["multi-user.target"];
+          after = ["network-online.target"];
+          wants = ["network-online.target"];
           serviceConfig = with lib; {
             User = "crowdsec";
             Group = "crowdsec";
