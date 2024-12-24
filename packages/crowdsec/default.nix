@@ -45,6 +45,8 @@ buildGoModule rec {
 
   nativeBuildInputs = [installShellFiles];
 
+  outputs = ["out" "patterns"];
+
   subPackages = [
     "cmd/crowdsec"
     "cmd/crowdsec-cli"
@@ -66,6 +68,9 @@ buildGoModule rec {
   postInstall = ''
     mkdir -p $out/share/crowdsec
     cp -r ./config $out/share/crowdsec/
+
+    mkdir -p $patterns
+    mv ./config/patterns/* $patterns
 
     installShellCompletion --cmd cscli \
       --bash <($out/bin/cscli completion bash) \
