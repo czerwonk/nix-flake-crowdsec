@@ -276,7 +276,7 @@ in {
         "d '${dataDir}' 0750 ${user} ${group} - -"
         "d '${hubDir}' 0750 ${user} ${group} - -"
         "f '${cfg.settings.api.server.online_client.credentials_path}' 0750 ${user} ${group} - -"
-        "f '${cfg.settings.config_paths.index_path}' 0750 ${user} ${group} - -"
+        "f '${cfg.settings.config_paths.index_path}' 0750 ${user} ${group} - {}"
       ];
       users.users.${user} = {
         name = lib.mkDefault user;
