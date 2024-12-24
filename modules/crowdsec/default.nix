@@ -10,17 +10,10 @@
 
   pkg = cfg.package;
 
-  defaultPatterns = lib.mapAttrs (name: value: lib.mkDefault "${pkg}/share/crowdsec/config/patterns/${name}") (builtins.readDir "${pkg}/share/crowdsec/config/patterns");
-
-  patternsDir = pkgs.runCommandNoCC "crowdsec-patterns" {} ''
-    mkdir -p $out
-    ${lib.concatStringsSep "\n" (lib.attrValues (lib.mapAttrs (
-        k: v: ''
-          ln -sf ${v} $out/${k}
-        ''
-      )
-      cfg.patterns))}
-  '';
+  patternsDir = pkgs.buildPackages.symlinkJoin {
+    name = "crowdsec-patterns";
+    paths = [cfg.patterns pkg.patterns ];
+  };
 
   defaultSettings = with lib; {
     common = {
@@ -44,7 +37,7 @@
       enable = mkDefault true;
       acquisition_dir = let
         yamlFiles = map (format.generate "acquisition.yaml") cfg.acquisitions;
-        dir = pkgs.runCommand "crowdsec-acquisitions" {} ''
+        dir = pkgs.buildPackages.runCommand "crowdsec-acquisitions" {} ''
           mkdir -p $out
           ${lib.optionalString (yamlFiles != []) ''
             cp ${lib.concatStringsSep " " yamlFiles} $out
@@ -122,13 +115,14 @@ in {
     patterns = mkOption {
       description = ''
         A set of pattern files for parsing logs, in the form "type" to file containing the corresponding GROK patterns.
+        Files in the derriviatons will be merged into one and must only contains files in the root of the derivation.
         All default patterns are automatically included.
         See <https://github.com/crowdsecurity/crowdsec/tree/master/config/patterns>.
       '';
-      type = types.attrsOf types.pathInStore;
-      default = {};
+      type = types.listOf types.package; #types.attrsOf types.pathInStore;
+      default = [];
       example = lib.literalExpression ''
-        { ssh = ./patterns/ssh;}
+        [ (pkgs.writeTextDir "ssh" (builtins.readFile ./patterns/ssh)) ]
       '';
     };
     settings = mkOption {
@@ -162,7 +156,6 @@ in {
   in
     lib.mkIf (cfg.enable) {
       services.crowdsec.settings = defaultSettings;
-      services.crowdsec.patterns = defaultPatterns;
 
       environment = {
         systemPackages = [cscli];

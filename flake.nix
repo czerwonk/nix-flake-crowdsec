@@ -19,6 +19,7 @@
 
       checks = {
         minimal = import ./tests/minimal.nix {inherit pkgs self;};
+        pattern = import ./tests/patterns.nix {inherit pkgs self;};
       };
     });
   in (systems
