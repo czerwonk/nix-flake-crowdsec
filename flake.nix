@@ -16,6 +16,10 @@
 
       packages."crowdsec" = crowdsec;
       packages."crowdsec-firewall-bouncer" = bouncer-firewall;
+
+      checks = {
+        minimal = import ./tests/minimal.nix {inherit pkgs self;};
+      };
     });
   in (systems
     // {
