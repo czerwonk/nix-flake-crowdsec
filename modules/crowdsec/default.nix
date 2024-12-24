@@ -46,7 +46,9 @@
         yamlFiles = map (format.generate "acquisition.yaml") cfg.acquisitions;
         dir = pkgs.runCommand "crowdsec-acquisitions" {} ''
           mkdir -p $out
-          cp ${lib.concatStringsSep " " yamlFiles} $out
+          ${lib.optionalString (yamlFiles != []) ''
+            cp ${lib.concatStringsSep " " yamlFiles} $out
+          ''}
         '';
       in
         mkDefault dir;
@@ -104,7 +106,7 @@ in {
     };
     acquisitions = mkOption {
       type = with types; listOf format.type;
-      default = {};
+      default = [];
       description = ''
         A list of acquisition specifications, which define the data sources you want to be parsed.
         See <https://docs.crowdsec.net/u/getting_started/post_installation/acquisition_new> for details.
