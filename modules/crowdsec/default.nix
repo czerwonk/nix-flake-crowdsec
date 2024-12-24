@@ -58,7 +58,7 @@
         credentials_path = mkDefault "${stateDir}/local_api_credentials.yaml";
       };
       server = {
-        enable = mkDefault (cfg.enrollKeyFile != null);
+        enable = mkDefault true;
         listen_uri = mkDefault "127.0.0.1:8080";
 
         console_path = mkDefault "${stateDir}/console.yaml";
@@ -249,22 +249,22 @@ in {
                 set -eu
                 set -o pipefail
 
-                if [ ! -s "${cfg.settings.api.client.credentials_path}" ]; then
-                  cscli machine add "${cfg.name}" --auto
-                fi
-
                 ${lib.optionalString cfg.settings.api.server.enable ''
+                  if [ ! -s "${cfg.settings.api.client.credentials_path}" ]; then
+                    cscli machine add "${cfg.name}" --auto
+                  fi
+                ''}
+
+                ${lib.optionalString (cfg.enrollKeyFile != null) ''
                   if ! grep -q password "${cfg.settings.api.server.online_client.credentials_path}" ]; then
                     cscli capi register
                   fi
 
                   cscli hub update
 
-                  ${lib.optionalString (cfg.enrollKeyFile != null) ''
-                    if [ ! -e "${cfg.settings.api.server.console_path}" ]; then
-                      cscli console enroll "$(cat ${cfg.enrollKeyFile})" --name ${cfg.name}
-                    fi
-                  ''}
+                  if [ ! -e "${cfg.settings.api.server.console_path}" ]; then
+                    cscli console enroll "$(cat ${cfg.enrollKeyFile})" --name ${cfg.name}
+                  fi
                 ''}
               '';
             in ["${script}/bin/crowdsec-setup"];
