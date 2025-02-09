@@ -32,16 +32,16 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 }:
 buildGoModule rec {
   pname = "crowdsec";
-  version = "1.6.4";
+  version = "1.6.5";
 
   src = fetchFromGitHub {
     owner = "crowdsecurity";
     repo = pname;
     rev = "v${version}";
-    hash = "sha256-U3YnLjsD+Kl/6HD+RPP0gWa4N96X5wkbdCmIrxas1I8=";
+    hash = "sha256-Jt5qFY41TnkvDw2BPd+vfyskhLpnJnsiUmUJcADQ0so=";
   };
 
-  vendorHash = "sha256-PtBVXPbLNdJyS8v8H9eRB6sTPaiseg18+eXToHvH7tw=";
+  vendorHash = "sha256-I9h63iePhEMCy8IQNTomhgduGOyC3aoxz/0L4JQhhF8=";
 
   nativeBuildInputs = [installShellFiles];
 
