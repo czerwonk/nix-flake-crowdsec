@@ -32,18 +32,20 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 }:
 buildGoModule rec {
   pname = "crowdsec";
-  version = "1.6.2";
+  version = "1.6.4";
 
   src = fetchFromGitHub {
     owner = "crowdsecurity";
     repo = pname;
     rev = "v${version}";
-    hash = "sha256-3GpSpADtCNvekR7gjbIlqzog7PMog6Sra5tpcnUf/gk=";
+    hash = "sha256-U3YnLjsD+Kl/6HD+RPP0gWa4N96X5wkbdCmIrxas1I8=";
   };
 
-  vendorHash = "sha256-kkQYKiOSmFHjhOrYV40YRZX9w6rUue0NSKfw+Bqxb9s=";
+  vendorHash = "sha256-PtBVXPbLNdJyS8v8H9eRB6sTPaiseg18+eXToHvH7tw=";
 
   nativeBuildInputs = [installShellFiles];
+
+  outputs = ["out" "patterns"];
 
   subPackages = [
     "cmd/crowdsec"
@@ -66,6 +68,9 @@ buildGoModule rec {
   postInstall = ''
     mkdir -p $out/share/crowdsec
     cp -r ./config $out/share/crowdsec/
+
+    mkdir -p $patterns
+    mv ./config/patterns/* $patterns
 
     installShellCompletion --cmd cscli \
       --bash <($out/bin/cscli completion bash) \

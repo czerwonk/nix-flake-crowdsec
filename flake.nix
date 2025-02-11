@@ -16,12 +16,17 @@
 
       packages."crowdsec" = crowdsec;
       packages."crowdsec-firewall-bouncer" = bouncer-firewall;
+
+      checks = {
+        minimal = import ./tests/minimal.nix {inherit pkgs self;};
+        pattern = import ./tests/patterns.nix {inherit pkgs self;};
+      };
     });
   in (systems
     // {
       nixosModules = {
-        crowdsec = import ./modules/crowdsec;
-        crowdsec-firewall-bouncer = import ./modules/crowdsec-firewall-bouncer;
+        crowdsec = ./modules/crowdsec;
+        crowdsec-firewall-bouncer = ./modules/crowdsec-firewall-bouncer;
       };
       overlays.default = final: prev: {
         crowdsec = systems.packages.${final.system}.crowdsec;

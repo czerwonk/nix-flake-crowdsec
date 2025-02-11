@@ -10,17 +10,10 @@
 
   pkg = cfg.package;
 
-  defaultPatterns = lib.mapAttrs (name: value: lib.mkDefault "${pkg}/share/crowdsec/config/patterns/${name}") (builtins.readDir "${pkg}/share/crowdsec/config/patterns");
-
-  patternsDir = pkgs.runCommandNoCC "crowdsec-patterns" {} ''
-    mkdir -p $out
-    ${lib.concatStringsSep "\n" (lib.attrValues (lib.mapAttrs (
-        k: v: ''
-          ln -sf ${v} $out/${k}
-        ''
-      )
-      cfg.patterns))}
-  '';
+  patternsDir = pkgs.buildPackages.symlinkJoin {
+    name = "crowdsec-patterns";
+    paths = [cfg.patterns pkg.patterns ];
+  };
 
   defaultSettings = with lib; {
     common = {
@@ -44,9 +37,11 @@
       enable = mkDefault true;
       acquisition_dir = let
         yamlFiles = map (format.generate "acquisition.yaml") cfg.acquisitions;
-        dir = pkgs.runCommand "crowdsec-acquisitions" {} ''
+        dir = pkgs.buildPackages.runCommand "crowdsec-acquisitions" {} ''
           mkdir -p $out
-          cp ${lib.concatStringsSep " " yamlFiles} $out
+          ${lib.optionalString (yamlFiles != []) ''
+            cp ${lib.concatStringsSep " " yamlFiles} $out
+          ''}
         '';
       in
         mkDefault dir;
@@ -56,7 +51,7 @@
         credentials_path = mkDefault "${stateDir}/local_api_credentials.yaml";
       };
       server = {
-        enable = mkDefault (cfg.enrollKeyFile != null);
+        enable = mkDefault true;
         listen_uri = mkDefault "127.0.0.1:8080";
 
         console_path = mkDefault "${stateDir}/console.yaml";
@@ -88,13 +83,14 @@ in {
     };
     name = mkOption {
       type = types.str;
-      description = mdDoc ''
+      description = ''
         Name of the machine when registering it at the central or local api.
       '';
       default = config.networking.hostName;
+      defaultText = lib.literalExpression "config.networking.hostName";
     };
     enrollKeyFile = mkOption {
-      description = mdDoc ''
+      description = ''
         The file containing the enrollment key used to enroll the engine at the central api console.
         See <https://docs.crowdsec.net/docs/next/console/enrollment/#where-can-i-find-my-enrollment-key> for details.
       '';
@@ -103,8 +99,8 @@ in {
     };
     acquisitions = mkOption {
       type = with types; listOf format.type;
-      default = {};
-      description = mdDoc ''
+      default = [];
+      description = ''
         A list of acquisition specifications, which define the data sources you want to be parsed.
         See <https://docs.crowdsec.net/u/getting_started/post_installation/acquisition_new> for details.
       '';
@@ -117,19 +113,20 @@ in {
       ];
     };
     patterns = mkOption {
-      description = mdDoc ''
+      description = ''
         A set of pattern files for parsing logs, in the form "type" to file containing the corresponding GROK patterns.
+        Files in the derriviatons will be merged into one and must only contains files in the root of the derivation.
         All default patterns are automatically included.
         See <https://github.com/crowdsecurity/crowdsec/tree/master/config/patterns>.
       '';
-      type = types.attrsOf types.pathInStore;
-      default = {};
+      type = types.listOf types.package; #types.attrsOf types.pathInStore;
+      default = [];
       example = lib.literalExpression ''
-        { ssh = ./patterns/ssh;}
+        [ (pkgs.writeTextDir "ssh" (builtins.readFile ./patterns/ssh)) ]
       '';
     };
     settings = mkOption {
-      description = mdDoc ''
+      description = ''
         Settings for Crowdsec. Refer to the defaults at
         <https://github.com/crowdsecurity/crowdsec/blob/master/config/config.yaml>.
       '';
@@ -137,7 +134,7 @@ in {
       default = {};
     };
     allowLocalJournalAccess = mkOption {
-      description = mkDoc ''
+      description = ''
         Allow acquisitions from local systemd-journald.
         For details, see <https://doc.crowdsec.net/docs/data_sources/journald>.
       '';
@@ -166,7 +163,6 @@ in {
   in
     lib.mkIf (cfg.enable) {
       services.crowdsec.settings = defaultSettings;
-      services.crowdsec.patterns = defaultPatterns;
 
       environment = {
         systemPackages = [cscli];
@@ -253,22 +249,22 @@ in {
                 set -eu
                 set -o pipefail
 
-                if [ ! -s "${cfg.settings.api.client.credentials_path}" ]; then
-                  cscli machine add "${cfg.name}" --auto
-                fi
-
                 ${lib.optionalString cfg.settings.api.server.enable ''
+                  if [ ! -s "${cfg.settings.api.client.credentials_path}" ]; then
+                    cscli machine add "${cfg.name}" --auto
+                  fi
+                ''}
+
+                ${lib.optionalString (cfg.enrollKeyFile != null) ''
                   if ! grep -q password "${cfg.settings.api.server.online_client.credentials_path}" ]; then
                     cscli capi register
                   fi
 
                   cscli hub update
 
-                  ${lib.optionalString (cfg.enrollKeyFile != null) ''
-                    if [ ! -e "${cfg.settings.api.server.console_path}" ]; then
-                      cscli console enroll "$(cat ${cfg.enrollKeyFile})" --name ${cfg.name}
-                    fi
-                  ''}
+                  if [ ! -e "${cfg.settings.api.server.console_path}" ]; then
+                    cscli console enroll "$(cat ${cfg.enrollKeyFile})" --name ${cfg.name}
+                  fi
                 ''}
                 ${cfg.extraExecStartPre}
               '';
@@ -281,7 +277,7 @@ in {
         "d '${dataDir}' 0750 ${user} ${group} - -"
         "d '${hubDir}' 0750 ${user} ${group} - -"
         "f '${cfg.settings.api.server.online_client.credentials_path}' 0750 ${user} ${group} - -"
-        "f '${cfg.settings.config_paths.index_path}' 0750 ${user} ${group} - -"
+        "f '${cfg.settings.config_paths.index_path}' 0750 ${user} ${group} - {}"
       ];
       users.users.${user} = {
         name = lib.mkDefault user;
