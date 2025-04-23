@@ -1,6 +1,7 @@
 {
   description = "CrowdSec is a free, open-source and collaborative IPS";
 
+  inputs.nixpkgs.url = "github:nixos/nixpkgs";
   outputs = {
     self,
     nixpkgs,
